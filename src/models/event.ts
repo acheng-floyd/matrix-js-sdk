@@ -125,6 +125,12 @@ export interface IEventRelation {
     key?: string;
 }
 
+export interface IVisibilityChangeRelation extends IEventRelation {
+    visibility: "visible" | "hidden";
+    reason?: string;
+}
+
+
 export interface IClearEvent {
     room_id?: string;
     type: string;
