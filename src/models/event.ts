@@ -28,9 +28,7 @@ import {
     EventType,
     MsgType,
     RelationType,
-    MSC3531_REASON_FIELD,
-    MSC3531_VISIBILITY_CHANGE_FIELD,
-    MSC3531_VISIBILITY_CHANGE_REL_TYPE,
+    MSC3531_VISIBILITY_CHANGE_TYPE,
 } from "../@types/event";
 import { Crypto, IEventDecryptionResult } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
@@ -133,6 +131,43 @@ export interface IVisibilityEventRelation extends IEventRelation {
     reason?: string;
 }
 
+/**
+ * When an event is a visibility change event, as per MSC3531,
+ * the visibility change implied by the event.
+ */
+export interface IVisibilityChange {
+    /**
+     * If `true`, the target event should be made visible.
+     * Otherwise, it should be hidden.
+     */
+    visible: boolean,
+
+    /**
+     * The event id affected.
+     */
+    eventId: string,
+
+    /**
+     * Optionally, a human-readable reason explaining why
+     * the event was hidden. Ignored if the event was made
+     * visible.
+     */
+    reason: string | null
+}
+
+interface IDecryptionResult {
+    clearEvent: {
+        room_id?: string;
+        type: string;
+        content: IContent;
+        unsigned?: IUnsigned;
+    };
+    forwardingCurve25519KeyChain?: string[];
+    senderCurve25519Key?: string;
+    claimedEd25519Key?: string;
+    untrusted?: boolean;
+}
+/* eslint-enable camelcase */
 
 export interface IClearEvent {
     room_id?: string;
@@ -968,7 +1003,9 @@ export class MatrixEvent extends EventEmitter {
      * @param visibilityEvent event causing the hide/unhide change.
      * @return true if the event caused a change, false if it should be ignored.
      */
-    public applyVisibilityEvent(visible: boolean, reason?: string): boolean {
+    public applyVisibilityEvent(visibilityChange?: IVisibilityChange): boolean {
+        const visible = visibilityChange ? visibilityChange.visible : true;
+        const reason = visibilityChange ? visibilityChange.reason : null;
         let change: boolean;
         switch (this.visibility.visible) {
             case true:
@@ -980,12 +1017,15 @@ export class MatrixEvent extends EventEmitter {
                     change = true;
                     this.visibility = Object.freeze({
                         visible: false,
-                        reason: reason || null,
+                        reason: reason,
                     });
                 } else {
                     change = false;
                 }
                 break;
+        }
+        if (change) {
+            this.emit("Event.onVisibilityChange", this, visible);
         }
         return change;
     }
@@ -1074,21 +1114,6 @@ export class MatrixEvent extends EventEmitter {
     }
 
     /**
-     * Check if this event alters the visibility of another event,
-     * as per https://github.com/matrix-org/matrix-doc/pull/3531.
-     *
-     * @returns {boolean} True if this event alters the visibility
-     * of another event.
-     */
-    public isVisibilityEvent(): boolean {
-        const relation = this.getRelation();
-        if (!relation) {
-            return false;
-        }
-        return MSC3531_VISIBILITY_CHANGE_REL_TYPE.matches(relation.rel_type);
-    }
-
-    /**
      * Return the visibility change caused by this event,
      * as per https://github.com/matrix-org/matrix-doc/pull/3531.
      *
@@ -1097,15 +1122,61 @@ export class MatrixEvent extends EventEmitter {
      * "hidden" if the event is a well-formed visibility change specifying
      * that the original message should now be hidden or null otherwise.
      */
-    public getVisibilityEventChange(): "visible" | "hidden" | null {
+    public asVisibilityChange(): IVisibilityChange | null {
+        if (!MSC3531_VISIBILITY_CHANGE_TYPE.matches(this.getType())) {
+            return null;
+        }
         const relation = this.getRelation();
-        if (!relation) {
+        if (!relation || relation.rel_type != "m.reference") {
             return null;
         }
-        if (!MSC3531_VISIBILITY_CHANGE_REL_TYPE.matches(relation.rel_type)) {
+        const eventId = relation.event_id;
+        if (!eventId) {
             return null;
         }
-        switch (MSC3531_VISIBILITY_CHANGE_FIELD.findIn(relation)) {
+        const content = this.getWireContent();
+        let visible: boolean;
+        switch (content.visibility) {
+            case "visible":
+                visible = true;
+                break;
+            case "hidden":
+                visible = false;
+                break;
+            default:
+                return null;
+        }
+        const reason = content.reason;
+        if (reason && typeof reason != "string") {
+            return null;
+        }
+        return {
+            visible,
+            reason,
+            eventId,
+        };
+    }
+
+    /**
+     * Check if this event alters the visibility of another event,
+     * as per https://github.com/matrix-org/matrix-doc/pull/3531.
+     *
+     * @returns {boolean} True if this event alters the visibility
+     * of another event.
+     */
+    public isVisibilityEvent(): boolean {
+        return MSC3531_VISIBILITY_CHANGE_TYPE.matches(this.getType());
+    }
+
+    public getVisibilityEventChange(): "visible" | "hidden" | null {
+        if (!this.isVisibilityEvent()) {
+            return null;
+        }
+        const content = this.getContent();
+        if (!content) {
+            return null;
+        }
+        switch (content.visibility) {
             case "visible":
                 return "visible";
             case "hidden":
@@ -1124,20 +1195,13 @@ export class MatrixEvent extends EventEmitter {
      * event and a reason was specified.
      */
     public getVisibilityEventReason(): string | null {
-        if (!this.isVisibilityEvent()) {
+        const content = this.getContent();
+        if (!content) {
             return null;
         }
-        const content = this.getContent();
-        for (const key of [
-            MSC3531_REASON_FIELD.stable,
-            MSC3531_REASON_FIELD.unstable]) {
-            if (!key) {
-                continue;
-            }
-            const reason = content[key];
-            if (!reason && typeof reason == "string") {
-                return reason;
-            }
+        const reason = content.reason;
+        if (typeof reason === "string") {
+            return reason;
         }
         return null;
     }

@@ -32,14 +32,13 @@ import { logger } from '../logger';
 import { ReEmitter } from '../ReEmitter';
 import {
     EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
-    MSC3531_VISIBILITY_CHANGE_REL_TYPE,
+    MSC3531_VISIBILITY_CHANGE_TYPE,
 } from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
 import { Thread, ThreadEvent } from "./thread";
-import { IVisibilityEventRelation } from "..";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -2306,42 +2305,24 @@ export class Room extends EventEmitter {
      *   patch it to reflect the visibility change and inform listeners.
      */
     private applyNewVisibilityEvent(event: MatrixEvent): void {
-        // Perform sanity checks on the event.
-        if (!event.isVisibilityEvent()) {
+        const visibilityChange = event.asVisibilityChange();
+        if (!visibilityChange) {
             // Internal error.
             throw new Error("Expected a visibility change relation");
-        }
-
-        const relation = event.getRelation();
-        const originalEventId = relation.event_id;
-        let visible: boolean;
-        switch (event.getVisibilityEventChange()) {
-            case "hidden":
-                visible = false;
-                break;
-            case "visible":
-                visible = true;
-                break;
-            default:
-                // Event is ill-formed.
-                return;
-        }
-        const reason = visible ? event.getContent()["reason"] : null;
-        if (reason && typeof reason !== "string") {
-            // Event is ill-formed.
-            return;
         }
 
         // Ignore visibility change events that are not emitted by moderators.
         const powerLevelsEvents = this.currentState.getStateEvents(EventType.RoomPowerLevels, "");
         const powerLevels = powerLevelsEvents && powerLevelsEvents.getContent();
         if (!powerLevels) {
+            logger.debug("applyNewVisibilityEvent", "Discarding visibility event without powerlevel", event);
             return;
         }
-        const powerLevel = powerLevels[MSC3531_VISIBILITY_CHANGE_REL_TYPE.unstable]
-            || powerLevels[MSC3531_VISIBILITY_CHANGE_REL_TYPE.name]
+        const powerLevel = powerLevels[MSC3531_VISIBILITY_CHANGE_TYPE.unstable]
+            || powerLevels[MSC3531_VISIBILITY_CHANGE_TYPE.name]
             || powerLevels.events_default || 0;
         if (powerLevel > event.sender.powerLevel) {
+            logger.debug("applyNewVisibilityEvent", "Discarding visibility event with insufficient powerlevel", event);
             return;
         }
 
@@ -2349,7 +2330,7 @@ export class Room extends EventEmitter {
         // If the event is not in our timeline and we only receive it later,
         // we may need to apply the visibility change at a later date.
 
-        const visibilityEventsOnOriginalEvent = this.visibilityEvents.get(originalEventId);
+        const visibilityEventsOnOriginalEvent = this.visibilityEvents.get(visibilityChange.eventId);
         if (visibilityEventsOnOriginalEvent) {
             // It would be tempting to simply erase the latest visibility change
             // but we need to record all of the changes in case the latest change
@@ -2365,23 +2346,33 @@ export class Room extends EventEmitter {
                 }
             }
             if (index === -1) {
+                logger.debug("applyNewVisibilityEvent", "Injecting oldest visibility change for event",
+                    visibilityChange.eventId, event);
                 visibilityEventsOnOriginalEvent.unshift(event);
             } else {
+                logger.debug("applyNewVisibilityEvent", "Injecting visibility change for event at",
+                    index, visibilityChange.eventId, event);
                 visibilityEventsOnOriginalEvent.splice(index + 1, 0, event);
             }
         } else {
-            this.visibilityEvents.set(originalEventId, [event]);
+            logger.debug("applyNewVisibilityEvent", "This is the first visibility change for event",
+                visibilityChange.eventId, event);
+            this.visibilityEvents.set(visibilityChange.eventId, [event]);
         }
 
         // Finally, let's check if the event is already in our timeline.
         // If so, we need to patch it and inform listeners.
 
-        const originalEvent = this.findEventById(originalEventId);
+        const originalEvent = this.findEventById(visibilityChange.eventId);
         if (!originalEvent) {
+            logger.debug("applyNewVisibilityEvent", "Original event is not loaded yet");
             return;
         }
-        if (originalEvent.applyVisibilityEvent(visible, reason)) {
+        if (originalEvent.applyVisibilityEvent(visibilityChange)) {
+            logger.debug("applyNewVisibilityEvent", "Propagating change");
             this.emit("Room.visibilityChange", event);
+        } else {
+            logger.debug("applyNewVisibilityEvent", "This change has no consequence");
         }
     }
 
@@ -2417,32 +2408,18 @@ export class Room extends EventEmitter {
             if (index === 0) {
                 // We have just removed the only visibility change event.
                 this.visibilityEvents.delete(originalEventId);
-                if (originalEvent.applyVisibilityEvent(true)) {
+                if (originalEvent.applyVisibilityEvent()) {
                     this.emit("Room.visibilityChange", null);
                 }
             } else {
                 const newEvent = visibilityEventsOnOriginalEvent[visibilityEventsOnOriginalEvent.length - 1];
-                const newrelation = newEvent.getRelation();
-                let visible: boolean;
-                switch (newrelation["visibility"]) {
-                    case "hidden":
-                        visible = false;
-                        break;
-                    case "visible":
-                        visible = true;
-                        break;
-                    default:
-                        // Event is ill-formed.
-                        // This breaks our invariant.
-                        throw new Error("at this stage, visibility changes should be well-formed");
-                }
-                const reason = visible ? newEvent.getContent()["reason"] : null;
-                if (reason && typeof reason !== "string") {
+                const newVisibility = newEvent.asVisibilityChange();
+                if (!newVisibility) {
                     // Event is ill-formed.
                     // This breaks our invariant.
                     throw new Error("at this stage, visibility changes should be well-formed");
                 }
-                if (originalEvent.applyVisibilityEvent(visible, reason)) {
+                if (originalEvent.applyVisibilityEvent(newVisibility)) {
                     this.emit("Room.visibilityChange", newEvent);
                 }
             }
@@ -2464,21 +2441,23 @@ export class Room extends EventEmitter {
             // No pending visibility change in store.
             return;
         }
-        const visibilityChange = visibilityEvents[visibilityEvents.length - 1];
-        const relation = visibilityChange.getRelation() as IVisibilityEventRelation;
-        if (relation.visibility == "visible") {
+        const visibilityEvent = visibilityEvents[visibilityEvents.length - 1];
+        const visibilityChange = visibilityEvent.asVisibilityChange();
+        if (!visibilityChange) {
+            return;
+        }
+        if (visibilityChange.visible) {
             // Events are visible by default, no need to apply a visibility change.
             // Note that we need to keep the visibility changes in `visibilityEvents`,
             // in case we later fetch an older visibility change event that is superseded
             // by `visibilityChange`.
-            return;
         }
-        if (visibilityChange.getTs() < event.getTs()) {
+        if (visibilityEvent.getTs() < event.getTs()) {
             // Something is wrong, the visibility change cannot happen before the
             // event. Presumably an ill-formed event.
             return;
         }
-        event.applyVisibilityEvent(false, relation.reason);
+        event.applyVisibilityEvent(visibilityChange);
     }
 }
 

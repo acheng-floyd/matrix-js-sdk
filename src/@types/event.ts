@@ -178,34 +178,14 @@ export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = new UnstableValue(
     "io.element.functional_members");
 
 /**
- * A rel_type that affects visibility of a message,
+ * A type of message that affects visibility of a message,
  * as per https://github.com/matrix-org/matrix-doc/pull/3531
  *
  * @experimental
  */
-export const MSC3531_VISIBILITY_CHANGE_REL_TYPE = new UnstableValue(
+export const MSC3531_VISIBILITY_CHANGE_TYPE = new UnstableValue(
     "org.matrix.msc3531.visibility",
     "m.visibility");
-
-/**
- * Within an event with rel_type MSC3531_VISIBILITY_CHANGE_REL_TYPE,
- * a field that contains the new visibility of the event.
- *
- * @experimental
- */
-export const MSC3531_VISIBILITY_CHANGE_FIELD = new UnstableValue(
-    "org.matrix.msc3531.visibility",
-    "visibility");
-
-/**
- * Within an event with rel_type MSC3531_VISIBILITY_CHANGE_REL_TYPE,
- * an optional content field that contains the new visibility of the event.
- *
- * @experimental
- */
-export const MSC3531_REASON_FIELD = new UnstableValue(
-    "org.matrix.msc3531.reason",
-    "reason");
 
 export interface IEncryptedFile {
     url: string;
