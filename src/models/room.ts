@@ -2312,6 +2312,11 @@ export class Room extends EventEmitter {
         }
 
         // Ignore visibility change events that are not emitted by moderators.
+        const user = event.sender || this.getMember(this.myUserId);
+        if (!user) {
+            logger.error("applyNewVisibilityEvent", "Couldn't find my user");
+            return;
+        }
         const powerLevelsEvents = this.currentState.getStateEvents(EventType.RoomPowerLevels, "");
         const powerLevels = powerLevelsEvents && powerLevelsEvents.getContent();
         if (!powerLevels) {
@@ -2321,7 +2326,7 @@ export class Room extends EventEmitter {
         const powerLevel = powerLevels[MSC3531_VISIBILITY_CHANGE_TYPE.unstable]
             || powerLevels[MSC3531_VISIBILITY_CHANGE_TYPE.name]
             || powerLevels.events_default || 0;
-        if (powerLevel > event.sender.powerLevel) {
+        if (powerLevel > user.powerLevel) {
             logger.debug("applyNewVisibilityEvent", "Discarding visibility event with insufficient powerlevel", event);
             return;
         }
