@@ -155,20 +155,6 @@ export interface IVisibilityChange {
     reason: string | null
 }
 
-interface IDecryptionResult {
-    clearEvent: {
-        room_id?: string;
-        type: string;
-        content: IContent;
-        unsigned?: IUnsigned;
-    };
-    forwardingCurve25519KeyChain?: string[];
-    senderCurve25519Key?: string;
-    claimedEd25519Key?: string;
-    untrusted?: boolean;
-}
-/* eslint-enable camelcase */
-
 export interface IClearEvent {
     room_id?: string;
     type: string;
@@ -1117,39 +1103,32 @@ export class MatrixEvent extends EventEmitter {
      * Return the visibility change caused by this event,
      * as per https://github.com/matrix-org/matrix-doc/pull/3531.
      *
-     * @returns "visible" if the event is a well-formed visibility change
-     * event specifying that the original message should now be visible,
-     * "hidden" if the event is a well-formed visibility change specifying
-     * that the original message should now be hidden or null otherwise.
+     * @returns If the event is a well-formed visibility change event,
+     * an instance of `IVisibilityChange`, otherwise `null`.
      */
     public asVisibilityChange(): IVisibilityChange | null {
         if (!MSC3531_VISIBILITY_CHANGE_TYPE.matches(this.getType())) {
+            // Not a visibility change event.
             return null;
         }
         const relation = this.getRelation();
         if (!relation || relation.rel_type != "m.reference") {
+            // Ill-formed, ignore this event.
             return null;
         }
         const eventId = relation.event_id;
         if (!eventId) {
+            // Ill-formed, ignore this event.
             return null;
         }
         const content = this.getWireContent();
-        let visible: boolean;
-        switch (content.visibility) {
-            case "visible":
-                visible = true;
-                break;
-            case "hidden":
-                visible = false;
-                break;
-            default:
-                return null;
-        }
+        const visible = !!content.visible;
         const reason = content.reason;
         if (reason && typeof reason != "string") {
+            // Ill-formed, ignore this event.
             return null;
         }
+        // Well-formed visibility change event.
         return {
             visible,
             reason,
@@ -1166,25 +1145,6 @@ export class MatrixEvent extends EventEmitter {
      */
     public isVisibilityEvent(): boolean {
         return MSC3531_VISIBILITY_CHANGE_TYPE.matches(this.getType());
-    }
-
-    public getVisibilityEventChange(): "visible" | "hidden" | null {
-        if (!this.isVisibilityEvent()) {
-            return null;
-        }
-        const content = this.getContent();
-        if (!content) {
-            return null;
-        }
-        switch (content.visibility) {
-            case "visible":
-                return "visible";
-            case "hidden":
-                return "hidden";
-            default:
-                // Event is ill-formed.
-                return null;
-        }
     }
 
     /**
