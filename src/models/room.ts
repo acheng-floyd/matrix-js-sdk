@@ -2307,8 +2307,8 @@ export class Room extends EventEmitter {
     private applyNewVisibilityEvent(event: MatrixEvent): void {
         const visibilityChange = event.asVisibilityChange();
         if (!visibilityChange) {
-            // Internal error.
-            throw new Error("Expected a visibility change relation");
+            // The event is ill-formed.
+            return;
         }
 
         // Ignore visibility change events that are not emitted by moderators.

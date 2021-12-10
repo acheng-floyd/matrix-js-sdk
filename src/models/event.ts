@@ -1011,7 +1011,7 @@ export class MatrixEvent extends EventEmitter {
                 break;
         }
         if (change) {
-            this.emit("Event.onVisibilityChange", this, visible);
+            this.emit("Event.visibilityChange", this, visible);
         }
         return change;
     }
