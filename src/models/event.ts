@@ -140,19 +140,19 @@ export interface IVisibilityChange {
      * If `true`, the target event should be made visible.
      * Otherwise, it should be hidden.
      */
-    visible: boolean,
+    visible: boolean;
 
     /**
      * The event id affected.
      */
-    eventId: string,
+    eventId: string;
 
     /**
      * Optionally, a human-readable reason explaining why
      * the event was hidden. Ignored if the event was made
      * visible.
      */
-    reason: string | null
+    reason: string | null;
 }
 
 export interface IClearEvent {
@@ -992,26 +992,26 @@ export class MatrixEvent extends EventEmitter {
     public applyVisibilityEvent(visibilityChange?: IVisibilityChange): boolean {
         const visible = visibilityChange ? visibilityChange.visible : true;
         const reason = visibilityChange ? visibilityChange.reason : null;
-        let change: boolean;
-        switch (this.visibility.visible) {
-            case true:
-                change = !visible;
-                this.visibility = MESSAGE_VISIBLE;
-                break;
-            case false:
-                if (visible || this.visibility.reason != reason) {
-                    change = true;
-                    this.visibility = Object.freeze({
-                        visible: false,
-                        reason: reason,
-                    });
-                } else {
-                    change = false;
-                }
-                break;
+        logger.debug("MatrixEvent", "Changing visibility", this.visibility, visibilityChange);
+        let change = false;
+        if (this.visibility.visible != visibilityChange.visible) {
+            change = true;
+        } else if (!this.visibility.visible && this.visibility["reason"] != reason) {
+            change = true;
         }
         if (change) {
-            this.emit("Event.visibilityChange", this, visible);
+            if (visible) {
+                this.visibility = MESSAGE_VISIBLE;
+            } else {
+                this.visibility = Object.freeze({
+                    visible: false,
+                    reason: reason,
+                });
+            }
+            logger.debug("MatrixEvent", "Changing visibility =>", this.visibility, change);
+            if (change) {
+                this.emit("Event.visibilityChange", this, visible);
+            }
         }
         return change;
     }

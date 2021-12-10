@@ -68,6 +68,16 @@ export class NamespacedValue<S extends string, U extends string> {
         }
         return included;
     }
+
+    public some(cb: (string) => boolean): boolean {
+        if (this.name && cb(this.name)) {
+            return true;
+        }
+        if (this.altName && cb(this.altName)) {
+            return true;
+        }
+        return false;
+    }
 }
 
 /**
