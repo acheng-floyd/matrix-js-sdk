@@ -28,7 +28,7 @@ import {
     EventType,
     MsgType,
     RelationType,
-    MSC3531_VISIBILITY_CHANGE_TYPE,
+    VISIBILITY_CHANGE_TYPE,
 } from "../@types/event";
 import { Crypto, IEventDecryptionResult } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
@@ -1107,7 +1107,7 @@ export class MatrixEvent extends EventEmitter {
      * an instance of `IVisibilityChange`, otherwise `null`.
      */
     public asVisibilityChange(): IVisibilityChange | null {
-        if (!MSC3531_VISIBILITY_CHANGE_TYPE.matches(this.getType())) {
+        if (!VISIBILITY_CHANGE_TYPE.matches(this.getType())) {
             // Not a visibility change event.
             return null;
         }
@@ -1144,7 +1144,7 @@ export class MatrixEvent extends EventEmitter {
      * of another event.
      */
     public isVisibilityEvent(): boolean {
-        return MSC3531_VISIBILITY_CHANGE_TYPE.matches(this.getType());
+        return VISIBILITY_CHANGE_TYPE.matches(this.getType());
     }
 
     /**

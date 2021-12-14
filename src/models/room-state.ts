@@ -27,6 +27,7 @@ import { EventType } from "../@types/event";
 import { MatrixEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
+import { UnstableValue } from "../NamespacedValue";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -607,13 +608,15 @@ export class RoomState extends EventEmitter {
     /**
      * Returns true if the given user ID has permission to send a normal
      * event of type `eventType` into this room.
-     * @param {string} eventType The type of event to test
+     * @param {string} eventType The type of event to test.
      * @param {string} userId The user ID of the user to test permission for
      * @return {boolean} true if the given user ID should be permitted to send
      *                        the given type of event into this room,
      *                        according to the room's state.
      */
-    public maySendEvent(eventType: EventType | string, userId: string): boolean {
+    public maySendEvent<S extends string, T extends string>(
+        eventType: EventType | string | UnstableValue<S, T>,
+        userId: string): boolean {
         return this.maySendEventOfType(eventType, userId, false);
     }
 
@@ -626,7 +629,9 @@ export class RoomState extends EventEmitter {
      *                        the given type of state event into this room,
      *                        according to the room's state.
      */
-    public mayClientSendStateEvent(stateEventType: EventType | string, cli: MatrixClient): boolean {
+    public mayClientSendStateEvent<S extends string, T extends string>(
+        stateEventType: EventType | string | UnstableValue<S, T>,
+        cli: MatrixClient): boolean {
         if (cli.isGuest()) {
             return false;
         }
@@ -642,7 +647,9 @@ export class RoomState extends EventEmitter {
      *                        the given type of state event into this room,
      *                        according to the room's state.
      */
-    public maySendStateEvent(stateEventType: EventType | string, userId: string): boolean {
+    public maySendStateEvent<S extends string, T extends string>(
+        stateEventType: EventType | string | UnstableValue<S, T>,
+        userId: string): boolean {
         return this.maySendEventOfType(stateEventType, userId, true);
     }
 
@@ -658,7 +665,9 @@ export class RoomState extends EventEmitter {
      *                        the given type of event into this room,
      *                        according to the room's state.
      */
-    private maySendEventOfType(eventType: EventType | string, userId: string, state: boolean): boolean {
+    private maySendEventOfType<S extends string, T extends string>(
+        eventType: EventType | string | UnstableValue<S, T>,
+        userId: string, state: boolean): boolean {
         const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, '');
 
         let powerLevels;
@@ -690,10 +699,45 @@ export class RoomState extends EventEmitter {
         }
 
         let requiredLevel = state ? stateDefault : eventsDefault;
-        if (Number.isSafeInteger(eventsLevels[eventType])) {
-            requiredLevel = eventsLevels[eventType];
+        const eventTypes = eventType instanceof UnstableValue ? [...eventType] : [eventType];
+        for (const eventType of eventTypes) {
+            if (Number.isSafeInteger(eventsLevels[eventType])) {
+                requiredLevel = eventsLevels[eventType];
+                break;
+            }
         }
         return powerLevel >= requiredLevel;
+    }
+
+    public requiredPowerLevelFor(eventTypes: [EventType | string], state: boolean): number {
+        const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, '');
+
+        let powerLevels;
+        let eventsLevels = {};
+
+        let stateDefault = 0;
+        let eventsDefault = 0;
+        if (powerLevelsEvent) {
+            powerLevels = powerLevelsEvent.getContent();
+            eventsLevels = powerLevels.events || {};
+
+            if (Number.isSafeInteger(powerLevels.state_default)) {
+                stateDefault = powerLevels.state_default;
+            } else {
+                stateDefault = 50;
+            }
+
+            if (Number.isSafeInteger(powerLevels.events_default)) {
+                eventsDefault = powerLevels.events_default;
+            }
+        }
+
+        for (const eventType of eventTypes) {
+            if (Number.isSafeInteger(eventsLevels[eventType])) {
+                return eventsLevels[eventType];
+            }
+        }
+        return state ? stateDefault : eventsDefault;
     }
 
     /**

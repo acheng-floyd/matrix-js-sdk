@@ -32,7 +32,7 @@ import { logger } from '../logger';
 import { ReEmitter } from '../ReEmitter';
 import {
     EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
-    MSC3531_VISIBILITY_CHANGE_TYPE,
+    VISIBILITY_CHANGE_TYPE,
 } from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
@@ -2317,17 +2317,8 @@ export class Room extends EventEmitter {
             logger.error("applyNewVisibilityEvent", "Couldn't find my user");
             return;
         }
-        const powerLevelsEvents = this.currentState.getStateEvents(EventType.RoomPowerLevels, "");
-        const powerLevels = powerLevelsEvents && powerLevelsEvents.getContent();
-        if (!powerLevels) {
-            logger.debug("applyNewVisibilityEvent", "Discarding visibility event without powerlevel", event);
-            return;
-        }
-        const powerLevel = powerLevels[MSC3531_VISIBILITY_CHANGE_TYPE.unstable]
-            || powerLevels[MSC3531_VISIBILITY_CHANGE_TYPE.name]
-            || powerLevels.events_default || 0;
-        if (powerLevel > user.powerLevel) {
-            logger.debug("applyNewVisibilityEvent", "Discarding visibility event with insufficient powerlevel", event);
+        if (!this.currentState.maySendStateEvent(VISIBILITY_CHANGE_TYPE, user.userId)) {
+            // Powerlevel is insufficient.
             return;
         }
 

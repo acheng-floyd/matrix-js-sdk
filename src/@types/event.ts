@@ -183,7 +183,7 @@ export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = new UnstableValue(
  *
  * @experimental
  */
-export const MSC3531_VISIBILITY_CHANGE_TYPE = new UnstableValue(
+export const VISIBILITY_CHANGE_TYPE = new UnstableValue(
     "org.matrix.msc3531.visibility",
     "m.visibility");
 
