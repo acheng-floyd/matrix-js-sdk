@@ -254,7 +254,9 @@ export class Room extends EventEmitter {
         // all our per-room timeline sets. the first one is the unfiltered ones;
         // the subsequent ones are the filtered ones in no particular order.
         this.timelineSets = [new EventTimelineSet(this, opts)];
-        this.reEmitter.reEmit(this.getUnfilteredTimelineSet(), ["Room.timeline", "Room.timelineReset"]);
+        this.reEmitter.reEmit(this.getUnfilteredTimelineSet(), [
+            "Room.timeline", "Room.timelineReset",
+        ]);
 
         this.fixUpLegacyTimelineFields();
 
@@ -2312,13 +2314,14 @@ export class Room extends EventEmitter {
         }
 
         // Ignore visibility change events that are not emitted by moderators.
-        const user = event.sender || this.getMember(this.myUserId);
-        if (!user) {
+        const userId = event.getSender();
+        if (!userId) {
             logger.error("applyNewVisibilityEvent", "Couldn't find my user");
             return;
         }
-        if (!this.currentState.maySendStateEvent(VISIBILITY_CHANGE_TYPE, user.userId)) {
+        if (!this.currentState.maySendStateEvent(VISIBILITY_CHANGE_TYPE, userId)) {
             // Powerlevel is insufficient.
+            logger.debug("applyNewVisibilityEvent", "Ignore new visibility event, powerlevel is insufficient");
             return;
         }
 
@@ -2366,7 +2369,8 @@ export class Room extends EventEmitter {
         }
         if (originalEvent.applyVisibilityEvent(visibilityChange)) {
             logger.debug("applyNewVisibilityEvent", "Propagating change");
-            this.emit("Room.visibilityChange", event);
+            this.emit("Room.visibilityChange", originalEvent);
+            logger.debug("applyNewVisibilityEvent", "Change propagated");
         } else {
             logger.debug("applyNewVisibilityEvent", "This change has no consequence");
         }
@@ -2405,7 +2409,8 @@ export class Room extends EventEmitter {
                 // We have just removed the only visibility change event.
                 this.visibilityEvents.delete(originalEventId);
                 if (originalEvent.applyVisibilityEvent()) {
-                    this.emit("Room.visibilityChange", null);
+                    logger.debug("Redacting has changed visibility of event");
+                    this.emit("Room.visibilityChange", originalEvent);
                 }
             } else {
                 const newEvent = visibilityEventsOnOriginalEvent[visibilityEventsOnOriginalEvent.length - 1];
@@ -2416,7 +2421,8 @@ export class Room extends EventEmitter {
                     throw new Error("at this stage, visibility changes should be well-formed");
                 }
                 if (originalEvent.applyVisibilityEvent(newVisibility)) {
-                    this.emit("Room.visibilityChange", newEvent);
+                    logger.debug("Redacting has changed visibility of event");
+                    this.emit("Room.visibilityChange", originalEvent);
                 }
             }
         }
@@ -2623,3 +2629,4 @@ function memberNamesToRoomName(names: string[], count = (names.length + 1)) {
  * @param {string} membership The new membership value
  * @param {string} prevMembership The previous membership value
  */
+
