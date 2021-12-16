@@ -986,13 +986,17 @@ export class MatrixEvent extends EventEmitter {
     /**
      * Change the visibility of an event, as per https://github.com/matrix-org/matrix-doc/pull/3531 .
      *
-     * @param visibilityEvent event causing the hide/unhide change.
-     * @return true if the event caused a change, false if it should be ignored.
+     * @fires module:models/event.MatrixEvent#"Event.visibilityChange" if `visibilityEvent`
+     *   caused a change in the actual visibility of this event, either by making it
+     *   visible (if it was hidden), by making it hidden (if it was visible) or by
+     *   changing the reason (if it was hidden).
+     * @param visibilityEvent event holding a hide/unhide payload, or nothing
+     *   if the event is being reset to its original visibility (presumably
+     *   by a visibility event being redacted).
      */
-    public applyVisibilityEvent(visibilityChange?: IVisibilityChange): boolean {
+    public applyVisibilityEvent(visibilityChange?: IVisibilityChange) {
         const visible = visibilityChange ? visibilityChange.visible : true;
         const reason = visibilityChange ? visibilityChange.reason : null;
-        logger.debug("MatrixEvent", "Changing visibility", this.visibility, visibilityChange);
         let change = false;
         if (this.visibility.visible != visibilityChange.visible) {
             change = true;
@@ -1008,25 +1012,21 @@ export class MatrixEvent extends EventEmitter {
                     reason: reason,
                 });
             }
-            logger.debug("MatrixEvent", "Changing visibility =>", this.visibility, change);
             if (change) {
                 this.emit("Event.visibilityChange", this, visible);
             }
         }
-        return change;
     }
 
     /**
      * Return instructions to display or hide the message.
      *
-     * @returns An object `{visible, reason}` determining whether the message
-     * should be displayed. If `visible` is `true`, the message should be
-     * displayed as usual and `reason` should be ignored. Otherwise, the
-     * message should be hidden and `reason` _may_ contain a user-readable
-     * reason provided by a moderator.
+     * @returns Instructions determining whether the message
+     * should be displayed.
      */
     public messageVisibility(): MessageVisibility {
-        // Note: We may return `this.visibility` as it has been frozen.
+        // Note: We may return `this.visibility` without fear, as
+        // this is a shallow frozen object.
         return this.visibility;
     }
 

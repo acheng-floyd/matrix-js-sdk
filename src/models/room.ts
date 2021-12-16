@@ -107,6 +107,22 @@ interface IReceiptContent {
 
 type Receipts = Record<string, Record<string, IWrappedReceipt>>;
 
+// When inserting a visibility event affecting event `eventId`, we
+// need to scan through existing visibility events for `eventId`.
+// In theory, this could take an unlimited amount of time if:
+//
+// - the visibility event was sent by a moderator; and
+// - `eventId` already has many visibility changes (usually, it should
+//   be 2 or less); and
+// - for some reason, the visibility changes are received out of order
+//   (usually, this shouldn't happen at all).
+//
+// For this reason, we limit the number of events to scan through,
+// expecting that a broken visibility change for a single event in
+// an extremely uncommon case (possibly a DoS) is a small
+// price to pay to keep matrix-js-sdk responsive.
+const MAX_NUMBER_OF_VISIBILITY_EVENTS_TO_SCAN_THROUGH = 30;
+
 export enum NotificationCountType {
     Highlight = "highlight",
     Total = "total",
@@ -2316,12 +2332,10 @@ export class Room extends EventEmitter {
         // Ignore visibility change events that are not emitted by moderators.
         const userId = event.getSender();
         if (!userId) {
-            logger.error("applyNewVisibilityEvent", "Couldn't find my user");
             return;
         }
         if (!this.currentState.maySendStateEvent(VISIBILITY_CHANGE_TYPE, userId)) {
             // Powerlevel is insufficient.
-            logger.debug("applyNewVisibilityEvent", "Ignore new visibility event, powerlevel is insufficient");
             return;
         }
 
@@ -2334,28 +2348,25 @@ export class Room extends EventEmitter {
             // It would be tempting to simply erase the latest visibility change
             // but we need to record all of the changes in case the latest change
             // is ever redacted.
-            // In practice, it should be unusual for an event to have more than
-            // 2 visibility changes, so linear scans through `visibilityEvents`
-            // should be fast. It might be possible to DoS this feature, though.
+            //
+            // In practice, linear scans through `visibilityEvents` should be fast.
+            // However, to protect against a potential DoS attack, we limit the
+            // number of iterations in this loop.
             let index = visibilityEventsOnOriginalEvent.length - 1;
-            for (; index >= 0; --index) {
+            const min = Math.max(0,
+                visibilityEventsOnOriginalEvent.length - MAX_NUMBER_OF_VISIBILITY_EVENTS_TO_SCAN_THROUGH);
+            for (; index >= min; --index) {
                 const target = visibilityEventsOnOriginalEvent[index];
                 if (target.getTs() < event.getTs()) {
                     break;
                 }
             }
             if (index === -1) {
-                logger.debug("applyNewVisibilityEvent", "Injecting oldest visibility change for event",
-                    visibilityChange.eventId, event);
                 visibilityEventsOnOriginalEvent.unshift(event);
             } else {
-                logger.debug("applyNewVisibilityEvent", "Injecting visibility change for event at",
-                    index, visibilityChange.eventId, event);
                 visibilityEventsOnOriginalEvent.splice(index + 1, 0, event);
             }
         } else {
-            logger.debug("applyNewVisibilityEvent", "This is the first visibility change for event",
-                visibilityChange.eventId, event);
             this.visibilityEvents.set(visibilityChange.eventId, [event]);
         }
 
@@ -2364,16 +2375,9 @@ export class Room extends EventEmitter {
 
         const originalEvent = this.findEventById(visibilityChange.eventId);
         if (!originalEvent) {
-            logger.debug("applyNewVisibilityEvent", "Original event is not loaded yet");
             return;
         }
-        if (originalEvent.applyVisibilityEvent(visibilityChange)) {
-            logger.debug("applyNewVisibilityEvent", "Propagating change");
-            this.emit("Room.visibilityChange", originalEvent);
-            logger.debug("applyNewVisibilityEvent", "Change propagated");
-        } else {
-            logger.debug("applyNewVisibilityEvent", "This change has no consequence");
-        }
+        originalEvent.applyVisibilityEvent(visibilityChange);
     }
 
     private redactVisibilityChangeEvent(event: MatrixEvent) {
@@ -2408,10 +2412,7 @@ export class Room extends EventEmitter {
             if (index === 0) {
                 // We have just removed the only visibility change event.
                 this.visibilityEvents.delete(originalEventId);
-                if (originalEvent.applyVisibilityEvent()) {
-                    logger.debug("Redacting has changed visibility of event");
-                    this.emit("Room.visibilityChange", originalEvent);
-                }
+                originalEvent.applyVisibilityEvent();
             } else {
                 const newEvent = visibilityEventsOnOriginalEvent[visibilityEventsOnOriginalEvent.length - 1];
                 const newVisibility = newEvent.asVisibilityChange();
@@ -2420,10 +2421,7 @@ export class Room extends EventEmitter {
                     // This breaks our invariant.
                     throw new Error("at this stage, visibility changes should be well-formed");
                 }
-                if (originalEvent.applyVisibilityEvent(newVisibility)) {
-                    logger.debug("Redacting has changed visibility of event");
-                    this.emit("Room.visibilityChange", originalEvent);
-                }
+                originalEvent.applyVisibilityEvent(newVisibility);
             }
         }
     }
