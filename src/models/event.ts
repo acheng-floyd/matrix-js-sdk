@@ -28,7 +28,7 @@ import {
     EventType,
     MsgType,
     RelationType,
-    VISIBILITY_CHANGE_TYPE,
+    EVENT_VISIBILITY_CHANGE_TYPE,
 } from "../@types/event";
 import { Crypto, IEventDecryptionResult } from "../crypto";
 import { deepSortedObjectEntries } from "../utils";
@@ -1107,7 +1107,7 @@ export class MatrixEvent extends EventEmitter {
      * an instance of `IVisibilityChange`, otherwise `null`.
      */
     public asVisibilityChange(): IVisibilityChange | null {
-        if (!VISIBILITY_CHANGE_TYPE.matches(this.getType())) {
+        if (!EVENT_VISIBILITY_CHANGE_TYPE.matches(this.getType())) {
             // Not a visibility change event.
             return null;
         }
@@ -1144,26 +1144,7 @@ export class MatrixEvent extends EventEmitter {
      * of another event.
      */
     public isVisibilityEvent(): boolean {
-        return VISIBILITY_CHANGE_TYPE.matches(this.getType());
-    }
-
-    /**
-     * Return the optional reason for a visibility change event,
-     * as per https://github.com/matrix-org/matrix-doc/pull/3531.
-     *
-     * @returns a reason if the event is a valid visibility change
-     * event and a reason was specified.
-     */
-    public getVisibilityEventReason(): string | null {
-        const content = this.getContent();
-        if (!content) {
-            return null;
-        }
-        const reason = content.reason;
-        if (typeof reason === "string") {
-            return reason;
-        }
-        return null;
+        return EVENT_VISIBILITY_CHANGE_TYPE.matches(this.getType());
     }
 
     /**

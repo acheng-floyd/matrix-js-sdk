@@ -32,7 +32,7 @@ import { logger } from '../logger';
 import { ReEmitter } from '../ReEmitter';
 import {
     EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
-    VISIBILITY_CHANGE_TYPE,
+    EVENT_VISIBILITY_CHANGE_TYPE,
 } from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
@@ -177,13 +177,11 @@ export class Room extends EventEmitter {
      *
      * # Invariants
      *
-     * - within each list, all value events are classed by
+     * - within each list, all events are classed by
      *   chronological order;
-     * - all value events are events such that
-     *  `isVisibilityEvent()` returns `true`;
-     * - all varlue events are event such that
-     *   `getVisibilityEventChange()` is either `"visible"` or `"hidden"`;
-     * - within each list with key `eventId`, all value events
+     * - all events are events such that
+     *  `asVisibilityEvent()` returns a non-null `IVisibilityChange`;
+     * - within each list with key `eventId`, all events
      *   are in relation to `eventId`.
      *
      * @experimental
@@ -2334,7 +2332,7 @@ export class Room extends EventEmitter {
         if (!userId) {
             return;
         }
-        if (!this.currentState.maySendStateEvent(VISIBILITY_CHANGE_TYPE, userId)) {
+        if (!this.currentState.maySendStateEvent(EVENT_VISIBILITY_CHANGE_TYPE, userId)) {
             // Powerlevel is insufficient.
             return;
         }

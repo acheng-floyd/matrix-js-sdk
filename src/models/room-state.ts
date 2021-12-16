@@ -709,37 +709,6 @@ export class RoomState extends EventEmitter {
         return powerLevel >= requiredLevel;
     }
 
-    public requiredPowerLevelFor(eventTypes: [EventType | string], state: boolean): number {
-        const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, '');
-
-        let powerLevels;
-        let eventsLevels = {};
-
-        let stateDefault = 0;
-        let eventsDefault = 0;
-        if (powerLevelsEvent) {
-            powerLevels = powerLevelsEvent.getContent();
-            eventsLevels = powerLevels.events || {};
-
-            if (Number.isSafeInteger(powerLevels.state_default)) {
-                stateDefault = powerLevels.state_default;
-            } else {
-                stateDefault = 50;
-            }
-
-            if (Number.isSafeInteger(powerLevels.events_default)) {
-                eventsDefault = powerLevels.events_default;
-            }
-        }
-
-        for (const eventType of eventTypes) {
-            if (Number.isSafeInteger(eventsLevels[eventType])) {
-                return eventsLevels[eventType];
-            }
-        }
-        return state ? stateDefault : eventsDefault;
-    }
-
     /**
      * Returns true if the given user ID has permission to trigger notification
      * of type `notifLevelKey`
