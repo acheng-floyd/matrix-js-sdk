@@ -994,7 +994,7 @@ export class MatrixEvent extends EventEmitter {
      *   if the event is being reset to its original visibility (presumably
      *   by a visibility event being redacted).
      */
-    public applyVisibilityEvent(visibilityChange?: IVisibilityChange) {
+    public applyVisibilityEvent(visibilityChange?: IVisibilityChange): void {
         const visible = visibilityChange ? visibilityChange.visible : true;
         const reason = visibilityChange ? visibilityChange.reason : null;
         let change = false;
