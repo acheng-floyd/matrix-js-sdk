@@ -998,9 +998,9 @@ export class MatrixEvent extends EventEmitter {
         const visible = visibilityChange ? visibilityChange.visible : true;
         const reason = visibilityChange ? visibilityChange.reason : null;
         let change = false;
-        if (this.visibility.visible != visibilityChange.visible) {
+        if (this.visibility.visible !== visibilityChange.visible) {
             change = true;
-        } else if (!this.visibility.visible && this.visibility["reason"] != reason) {
+        } else if (!this.visibility.visible && this.visibility["reason"] !== reason) {
             change = true;
         }
         if (change) {

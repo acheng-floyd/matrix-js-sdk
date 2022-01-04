@@ -184,8 +184,8 @@ export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = new UnstableValue(
  * @experimental
  */
 export const EVENT_VISIBILITY_CHANGE_TYPE = new UnstableValue(
-    "org.matrix.msc3531.visibility",
-    "m.visibility");
+    "m.visibility",
+    "org.matrix.msc3531.visibility");
 
 export interface IEncryptedFile {
     url: string;
