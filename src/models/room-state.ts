@@ -27,7 +27,6 @@ import { EventType } from "../@types/event";
 import { MatrixEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
-import { UnstableValue } from "../NamespacedValue";
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -606,32 +605,28 @@ export class RoomState extends EventEmitter {
     }
 
     /**
-     * Returns true if the given user ID has permission to send a normal
-     * event of type `eventType` into this room.
-     * @param {string} eventType The type of event to test.
-     * @param {string} userId The user ID of the user to test permission for
-     * @return {boolean} true if the given user ID should be permitted to send
-     *                        the given type of event into this room,
-     *                        according to the room's state.
-     */
-    public maySendEvent<S extends string, T extends string>(
-        eventType: EventType | string | UnstableValue<S, T>,
-        userId: string): boolean {
+      * Returns true if the given user ID has permission to send a normal
+      * event of type `eventType` into this room.
+      * @param {string} eventType The type of event to test
+      * @param {string} userId The user ID of the user to test permission for
+      * @return {boolean} true if the given user ID should be permitted to send
+      *                        the given type of event into this room,
+      *                        according to the room's state.
+      */
+    public maySendEvent(eventType: EventType | string, userId: string): boolean {
         return this.maySendEventOfType(eventType, userId, false);
     }
 
     /**
-     * Returns true if the given MatrixClient has permission to send a state
-     * event of type `stateEventType` into this room.
-     * @param {string} stateEventType The type of state events to test
-     * @param {MatrixClient} cli The client to test permission for
-     * @return {boolean} true if the given client should be permitted to send
-     *                        the given type of state event into this room,
-     *                        according to the room's state.
-     */
-    public mayClientSendStateEvent<S extends string, T extends string>(
-        stateEventType: EventType | string | UnstableValue<S, T>,
-        cli: MatrixClient): boolean {
+      * Returns true if the given MatrixClient has permission to send a state
+      * event of type `stateEventType` into this room.
+      * @param {string} stateEventType The type of state events to test
+      * @param {MatrixClient} cli The client to test permission for
+      * @return {boolean} true if the given client should be permitted to send
+      *                        the given type of state event into this room,
+      *                        according to the room's state.
+      */
+    public mayClientSendStateEvent(stateEventType: EventType | string, cli: MatrixClient): boolean {
         if (cli.isGuest()) {
             return false;
         }
@@ -639,35 +634,31 @@ export class RoomState extends EventEmitter {
     }
 
     /**
-     * Returns true if the given user ID has permission to send a state
-     * event of type `stateEventType` into this room.
-     * @param {string} stateEventType The type of state events to test
-     * @param {string} userId The user ID of the user to test permission for
-     * @return {boolean} true if the given user ID should be permitted to send
-     *                        the given type of state event into this room,
-     *                        according to the room's state.
-     */
-    public maySendStateEvent<S extends string, T extends string>(
-        stateEventType: EventType | string | UnstableValue<S, T>,
-        userId: string): boolean {
+      * Returns true if the given user ID has permission to send a state
+      * event of type `stateEventType` into this room.
+      * @param {string} stateEventType The type of state events to test
+      * @param {string} userId The user ID of the user to test permission for
+      * @return {boolean} true if the given user ID should be permitted to send
+      *                        the given type of state event into this room,
+      *                        according to the room's state.
+      */
+    public maySendStateEvent(stateEventType: EventType | string, userId: string): boolean {
         return this.maySendEventOfType(stateEventType, userId, true);
     }
 
     /**
-     * Returns true if the given user ID has permission to send a normal or state
-     * event of type `eventType` into this room.
-     * @param {string} eventType The type of event to test
-     * @param {string} userId The user ID of the user to test permission for
-     * @param {boolean} state If true, tests if the user may send a state
-     event of this type. Otherwise tests whether
-     they may send a regular event.
-     * @return {boolean} true if the given user ID should be permitted to send
-     *                        the given type of event into this room,
-     *                        according to the room's state.
-     */
-    private maySendEventOfType<S extends string, T extends string>(
-        eventType: EventType | string | UnstableValue<S, T>,
-        userId: string, state: boolean): boolean {
+      * Returns true if the given user ID has permission to send a normal or state
+      * event of type `eventType` into this room.
+      * @param {string} eventType The type of event to test
+      * @param {string} userId The user ID of the user to test permission for
+      * @param {boolean} state If true, tests if the user may send a state
+      event of this type. Otherwise tests whether
+      they may send a regular event.
+      * @return {boolean} true if the given user ID should be permitted to send
+      *                        the given type of event into this room,
+      *                        according to the room's state.
+      */
+    private maySendEventOfType(eventType: EventType | string, userId: string, state: boolean): boolean {
         const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, '');
 
         let powerLevels;
@@ -699,12 +690,8 @@ export class RoomState extends EventEmitter {
         }
 
         let requiredLevel = state ? stateDefault : eventsDefault;
-        const eventTypes = eventType instanceof UnstableValue ? [...eventType] : [eventType];
-        for (const eventType of eventTypes) {
-            if (Number.isSafeInteger(eventsLevels[eventType])) {
-                requiredLevel = eventsLevels[eventType];
-                break;
-            }
+        if (Number.isSafeInteger(eventsLevels[eventType])) {
+            requiredLevel = eventsLevels[eventType];
         }
         return powerLevel >= requiredLevel;
     }

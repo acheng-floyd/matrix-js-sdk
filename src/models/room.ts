@@ -2332,7 +2332,7 @@ export class Room extends EventEmitter {
         if (!userId) {
             return;
         }
-        if (!this.currentState.maySendStateEvent(EVENT_VISIBILITY_CHANGE_TYPE, userId)) {
+        if (!EVENT_VISIBILITY_CHANGE_TYPE.some(name => this.currentState.maySendStateEvent(name, userId))) {
             // Powerlevel is insufficient.
             return;
         }

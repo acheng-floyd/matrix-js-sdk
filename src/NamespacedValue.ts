@@ -18,7 +18,7 @@ limitations under the License.
  * Represents a simple Matrix namespaced value. This will assume that if a stable prefix
  * is provided that the stable prefix should be used when representing the identifier.
  */
-export class NamespacedValue<S extends string, U extends string> implements Iterable<string> {
+export class NamespacedValue<S extends string, U extends string> {
     // Stable is optional, but one of the two parameters is required, hence the weird-looking types.
     // Goal is to to have developers explicitly say there is no stable value (if applicable).
     public constructor(public readonly stable: S | null | undefined, public readonly unstable?: U) {
@@ -70,18 +70,21 @@ export class NamespacedValue<S extends string, U extends string> implements Iter
     }
 
     /**
-     * Iterate through the names in this value, starting with
-     * the name (if any) before the altName (if any).
+     * Checks whether a predicate is matched either by the name or
+     * the altName.
+     *
+     * @param cb A predicate.
+     * @returns true if either the name is defined and cb(name) holds
+     *  or the altName is defined and cb(altName) holds
      */
-    [Symbol.iterator](): Iterator<string> {
-        return (function* () {
-            if (typeof this.name == "string") {
-                yield this.name;
-            }
-            if (typeof this.altName == "string") {
-                yield this.altName;
-            }
-        }).call(this);
+    public some(cb: (string) => boolean): boolean {
+        if (this.name && cb(this.name)) {
+            return true;
+        }
+        if (this.altName && cb(this.altName)) {
+            return true;
+        }
+        return false;
     }
 }
 
