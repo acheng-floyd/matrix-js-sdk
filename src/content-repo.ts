@@ -68,6 +68,7 @@ export function getHttpUriForMxc(
         // these are thumbnailing params so they probably want the
         // thumbnailing API...
         prefix = "/_matrix/media/r0/thumbnail/";
+        params["animated"] = "true";
     }
 
     const fragmentOffset = serverAndMediaId.indexOf("#");
